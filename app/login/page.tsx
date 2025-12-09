@@ -5,24 +5,24 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useRouter } from 'next/navigation'
 
 export default function LoginPage() {
   const [secretKey, setSecretKey] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-    
-    // Simple form submission without authentication logic
-    console.log('Secret key submitted:', secretKey)
-    
-    // Simulate processing delay
-    setTimeout(() => {
-      setIsLoading(false)
-      // Reset form
-      setSecretKey('')
-    }, 1000)
+    if (secretKey === "secret123") {
+      setError(false)
+      setIsLoading(true)
+      window.localStorage.setItem("isLoggedIn", "true")
+      router.push('/')
+    } else {
+      setError(true)
+    }
   }
 
   return (
@@ -41,13 +41,15 @@ export default function LoginPage() {
               <Input
                 id="secret-key"
                 type="password"
+                className='mb-2'
                 placeholder="Enter your secret key"
                 value={secretKey}
                 onChange={(e) => setSecretKey(e.target.value)}
                 required
               />
-              <p className="text-sm text-muted-foreground">
-                Hint: The secret key is <span className="font-mono">secret123</span>
+              <p className="text-sm text-red-500">
+                {error && "Invalid secret key"}
+                {/* Hint: The secret key is <span className="font-mono">secret123</span> */}
               </p>
             </div>
           </CardContent>
