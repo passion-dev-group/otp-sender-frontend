@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRouter } from 'next/navigation'
+import CryptoJS from "crypto-js"
+
+const authSecret = process.env.NEXT_PUBLIC_AUTH_SECRET
 
 export default function LoginPage() {
   const [secretKey, setSecretKey] = useState('')
@@ -13,12 +16,21 @@ export default function LoginPage() {
   const [error, setError] = useState(false)
   const router = useRouter()
 
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (secretKey === "secret123") {
+
+    if (secretKey === authSecret) {
+
       setError(false)
       setIsLoading(true)
-      window.localStorage.setItem("isLoggedIn", "true")
+      // todo: implement encryption and then save it in local storage 
+      // Encrypt the payload
+      const encrypted = CryptoJS.AES.encrypt(
+        JSON.stringify({ valid: true, token: authSecret }),
+        process.env.NEXT_PUBLIC_AUTH_ENCRYPTION_SECRET!
+      ).toString()
+      window.localStorage.setItem("auth_key", encrypted)
       router.push('/')
     } else {
       setError(true)
@@ -40,7 +52,7 @@ export default function LoginPage() {
               <Label htmlFor="secret-key">Secret Key</Label>
               <Input
                 id="secret-key"
-                type="password"
+                // type="password"
                 className='mb-2'
                 placeholder="Enter your secret key"
                 value={secretKey}

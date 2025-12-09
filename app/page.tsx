@@ -5,17 +5,37 @@ import { CampaignLaunch } from "@/components/campaign-launch"
 import { SummaryPage } from "@/components/summary-page"
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
+import CryptoJS from "crypto-js"
+
+
+const authSecret = process.env.NEXT_PUBLIC_AUTH_SECRET
 
 export default function Home() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const isLoggedIn = window.localStorage.getItem("isLoggedIn")
-    if (!isLoggedIn) {
+    try {
+      const authKey = window.localStorage.getItem("auth_key")
+
+      // If no auth key exists, redirect to login
+      if (!authKey) {
+        router.push("/login")
+        return
+      }
+
+      const bytes = CryptoJS.AES.decrypt(authKey, process.env.NEXT_PUBLIC_AUTH_ENCRYPTION_SECRET!)
+      const decrypted = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
+
+      if (decrypted.token === authSecret && decrypted.valid === true) {
+        setIsLoading(false)
+      } else {
+        router.push("/login")
+      }
+    } catch (error) {
+      // If decryption fails, redirect to login
+      console.error("Auth validation failed:", error)
       router.push("/login")
-    } else {
-      setIsLoading(false)
     }
   }, [router])
 
