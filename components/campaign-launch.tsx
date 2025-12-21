@@ -21,10 +21,10 @@ export function CampaignLaunch() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-[1fr_1fr_1.5fr_1.5fr_0.8fr_150px_70px_50px] gap-2 px-4 py-3 border-b-2 border-border items-center">
-        <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Service</div>
-        <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Destination</div>
-        <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Proxy</div>
+      <div className="grid grid-cols-[1fr_1fr_0.8fr_1.5fr_0.8fr_150px_70px_50px] gap-2 px-4 py-3 border-b-2 border-border items-center">
+        <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Site Name</div>
+        <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Country Name</div>
+        <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">OTP Type</div>
         <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Phone Numbers</div>
         <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Daily Amount</div>
         <div className="font-semibold text-xs text-muted-foreground uppercase tracking-wide">Status</div>

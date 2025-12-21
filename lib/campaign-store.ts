@@ -1,6 +1,7 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { Campaign, CampaignStatus } from "./types"
+import type { Campaign, CampaignStatus, OtpType } from "./types"
+import { createJob, cancelJob, getJobStatus } from "./api"
 
 interface ProcessingInterval {
   [key: string]: NodeJS.Timeout
@@ -12,9 +13,10 @@ interface CampaignStore {
   campaigns: Campaign[]
   archivedCampaigns: Campaign[]
   addCampaign: () => void
+  setPhoneFile: (id: string, file: File) => void
   updateCampaign: (id: string, updates: Partial<Campaign>) => void
-  startCampaign: (id: string) => void
-  pauseCampaign: (id: string) => void
+  startCampaign: (id: string) => Promise<void>
+  pauseCampaign: (id: string) => Promise<void>
   resumeCampaign: (id: string) => void
   archiveCampaign: (id: string) => void
   deleteCampaign: (id: string) => void
@@ -40,6 +42,7 @@ export const useCampaignStore = create<CampaignStore>()(
           processed: 644816,
           numberListHistory: ["500,000numberIT.xls"],
           createdAt: new Date(),
+          otpType: "TXT" as OtpType,
         },
         {
           id: "2",
@@ -53,6 +56,7 @@ export const useCampaignStore = create<CampaignStore>()(
           processed: 181018,
           numberListHistory: ["100,000numberES.xls"],
           createdAt: new Date(),
+          otpType: "TXT" as OtpType,
         },
         {
           id: "3",
@@ -66,6 +70,7 @@ export const useCampaignStore = create<CampaignStore>()(
           processed: 66414,
           numberListHistory: ["200,000numberDZ.xls"],
           createdAt: new Date(),
+          otpType: "TXT" as OtpType,
         },
         {
           id: "4",
@@ -79,6 +84,7 @@ export const useCampaignStore = create<CampaignStore>()(
           processed: 264318,
           numberListHistory: ["900,000number.xls"],
           createdAt: new Date(),
+          otpType: "TXT" as OtpType,
         },
       ],
       archivedCampaigns: [],
@@ -98,9 +104,18 @@ export const useCampaignStore = create<CampaignStore>()(
               processed: 0,
               numberListHistory: [],
               createdAt: new Date(),
+              otpType: "TXT" as OtpType,
             },
             ...state.campaigns,
           ],
+        }))
+      },
+
+      setPhoneFile: (id, file) => {
+        set((state) => ({
+          campaigns: state.campaigns.map((c) =>
+            c.id === id ? { ...c, phoneFile: file } : c
+          ),
         }))
       },
 
@@ -110,53 +125,122 @@ export const useCampaignStore = create<CampaignStore>()(
         }))
       },
 
-      startCampaign: (id) => {
-        console.log("[v0] Starting campaign:", id)
-        set((state) => ({
-          campaigns: state.campaigns.map((c) => (c.id === id ? { ...c, status: "in_progress" as CampaignStatus } : c)),
-        }))
+      startCampaign: async (id) => {
+        const campaign = get().campaigns.find((c) => c.id === id)
+        if (!campaign) return
 
-        // Clear existing interval if any
-        if (processingIntervals[id]) {
-          clearInterval(processingIntervals[id])
+        console.log("[API] Starting campaign:", id)
+
+        // Validate required fields
+        if (!campaign.service || !campaign.destination || !campaign.phoneFile) {
+          console.error("Missing required fields for campaign")
+          return
         }
 
-        // Start processing interval
-        processingIntervals[id] = setInterval(() => {
-          const campaign = get().campaigns.find((c) => c.id === id)
-          if (campaign?.status === "in_progress" && campaign.numberFile) {
-            const match = campaign.numberFile.match(/(\d+[.,]\d+|\d+)/)
-            if (match) {
-              const totalNumbers = Number.parseInt(match[1].replace(/[,.]/g, ""))
-              const dailyAmount = Number.parseInt(campaign.dailyAmount || "1000")
-              const increment = Math.floor(Math.random() * Math.min(100, dailyAmount / 100)) + 1
+        try {
+          // Create FormData for API call
+          const formData = new FormData()
+          formData.append("site_name", campaign.service)
+          formData.append("country_name", campaign.destination)
+          // otp_type: 0 = TXT, 1 = VOICE
+          const otpTypeValue = campaign.otpType === "VOICE" ? "1" : "0"
+          formData.append("otp_type", otpTypeValue)
+          formData.append("daily_amount", campaign.dailyAmount || "1000")
+          formData.append("phone_number_list", campaign.phoneFile)
+
+          // Call backend API
+          const response = await createJob(formData)
+
+          // Update campaign with jobId and status
+          set((state) => ({
+            campaigns: state.campaigns.map((c) =>
+              c.id === id
+                ? { ...c, status: "in_progress" as CampaignStatus, jobId: response.jobId }
+                : c
+            ),
+          }))
+
+          // Clear existing interval if any
+          if (processingIntervals[id]) {
+            clearInterval(processingIntervals[id])
+          }
+
+          // Start polling for status updates
+          processingIntervals[id] = setInterval(async () => {
+            try {
+              const currentCampaign = get().campaigns.find((c) => c.id === id)
+              if (!currentCampaign?.jobId || currentCampaign.status !== "in_progress") {
+                clearInterval(processingIntervals[id])
+                delete processingIntervals[id]
+                return
+              }
+
+              const status = await getJobStatus(currentCampaign.jobId)
+
+              // Map backend status to frontend status
+              let frontendStatus: CampaignStatus = "in_progress"
+              if (status.status === "completed") frontendStatus = "paused"
+              if (status.status === "cancelled") frontendStatus = "paused"
+              if (status.cancelled === 1) frontendStatus = "paused"
+
+              // Use jobDetail.completed for processed count
+              const processedCount = status.jobDetail?.completed ?? 0
 
               set((state) => ({
-                campaigns: state.campaigns.map((c) => {
-                  if (c.id === id) {
-                    const newProcessed = Math.min(c.processed + increment, totalNumbers)
-                    return { ...c, processed: newProcessed }
-                  }
-                  return c
-                }),
+                campaigns: state.campaigns.map((c) =>
+                  c.id === id
+                    ? { ...c, processed: processedCount, status: frontendStatus }
+                    : c
+                ),
               }))
+
+              // Stop polling if job is done
+              if (["completed", "cancelled"].includes(status.status) || status.cancelled === 1) {
+                clearInterval(processingIntervals[id])
+                delete processingIntervals[id]
+              }
+            } catch (error) {
+              console.error("Error polling job status:", error)
             }
-          } else {
-            clearInterval(processingIntervals[id])
-            delete processingIntervals[id]
-          }
-        }, 2000)
+          }, 5000)
+
+        } catch (error) {
+          console.error("Failed to start campaign:", error)
+          // Reset status on error
+          set((state) => ({
+            campaigns: state.campaigns.map((c) =>
+              c.id === id ? { ...c, status: "idle" as CampaignStatus } : c
+            ),
+          }))
+        }
       },
 
-      pauseCampaign: (id) => {
-        console.log("[v0] Pausing campaign:", id)
+      pauseCampaign: async (id) => {
+        const campaign = get().campaigns.find((c) => c.id === id)
+        console.log("[API] Pausing campaign:", id)
+
+        // Stop polling
         if (processingIntervals[id]) {
           clearInterval(processingIntervals[id])
           delete processingIntervals[id]
         }
+
+        // Update UI immediately
         set((state) => ({
-          campaigns: state.campaigns.map((c) => (c.id === id ? { ...c, status: "paused" as CampaignStatus } : c)),
+          campaigns: state.campaigns.map((c) =>
+            c.id === id ? { ...c, status: "paused" as CampaignStatus } : c
+          ),
         }))
+
+        // Cancel job on backend if it has a jobId
+        if (campaign?.jobId) {
+          try {
+            await cancelJob(campaign.jobId)
+            console.log("[API] Job cancelled successfully")
+          } catch (error) {
+            console.error("Failed to cancel job:", error)
+          }
+        }
       },
 
       resumeCampaign: (id) => {
@@ -261,10 +345,10 @@ export const useCampaignStore = create<CampaignStore>()(
           campaigns: state.campaigns.map((c) =>
             c.id === id
               ? {
-                  ...c,
-                  status: "paused" as CampaignStatus,
-                  numberFile: null,
-                }
+                ...c,
+                status: "paused" as CampaignStatus,
+                numberFile: null,
+              }
               : c,
           ),
         }))
@@ -284,10 +368,10 @@ export const useCampaignStore = create<CampaignStore>()(
             campaigns: state.campaigns.map((c) =>
               c.id === id
                 ? {
-                    ...c,
-                    numberFile: fileName,
-                    numberListHistory: [...c.numberListHistory, fileName],
-                  }
+                  ...c,
+                  numberFile: fileName,
+                  numberListHistory: [...c.numberListHistory, fileName],
+                }
                 : c,
             ),
           }))
@@ -296,6 +380,15 @@ export const useCampaignStore = create<CampaignStore>()(
     }),
     {
       name: "campaign-storage",
+      // Exclude phoneFile from persistence since File objects can't be serialized
+      partialize: (state) => ({
+        campaigns: state.campaigns.map(c => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { phoneFile, ...rest } = c;
+          return rest;
+        }),
+        archivedCampaigns: state.archivedCampaigns,
+      }),
     },
   ),
 )
