@@ -20,7 +20,7 @@ interface CampaignStore {
   resumeCampaign: (id: string) => void
   archiveCampaign: (id: string) => void
   deleteCampaign: (id: string) => void
-  pauseAndArchive: (id: string) => void
+  pauseAndArchive: (id: string) => Promise<void>
   pauseAndReplaceList: (id: string) => void
   deleteNumberList: (id: string) => void
   uploadNumberList: (id: string, fileName: string) => void
@@ -313,13 +313,28 @@ export const useCampaignStore = create<CampaignStore>()(
         }))
       },
 
-      pauseAndArchive: (id) => {
-        console.log("[v0] Pause and archive:", id)
+      pauseAndArchive: async (id) => {
+        console.log("[API] Pause and archive:", id)
+        const campaign = get().campaigns.find((c) => c.id === id)
+
+        // Stop polling
         if (processingIntervals[id]) {
           clearInterval(processingIntervals[id])
           delete processingIntervals[id]
         }
-        const campaign = get().campaigns.find((c) => c.id === id)
+
+        // Call DELETE API if campaign has a jobId
+        if (campaign?.jobId) {
+          try {
+            await cancelJob(campaign.jobId)
+            console.log("[API] Job deleted successfully")
+          } catch (error) {
+            console.error("Failed to delete job:", error)
+            // Continue with archiving even if API fails
+          }
+        }
+
+        // Archive the campaign
         if (campaign) {
           set((state) => ({
             campaigns: state.campaigns.filter((c) => c.id !== id),
