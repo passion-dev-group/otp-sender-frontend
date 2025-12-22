@@ -9,8 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Play, Pause, AlertCircle, Trash2 } from "lucide-react"
 import { useCampaignStore } from "@/lib/campaign-store"
 import { PauseOptionsDialog } from "@/components/pause-options-dialog"
-import type { Campaign } from "@/lib/types"
-import { SERVICES, COUNTRIES, PROXIES } from "@/lib/constants"
+import type { Campaign, OtpType } from "@/lib/types"
 
 interface CampaignRowProps {
   campaign: Campaign
@@ -27,6 +26,7 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
     pauseCampaign,
     resumeCampaign,
     uploadNumberList,
+    setPhoneFile,
     deleteCampaign,
     archiveCampaign,
   } = useCampaignStore()
@@ -48,7 +48,9 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      // Store both the filename and the actual file
       uploadNumberList(campaign.id, file.name)
+      setPhoneFile(campaign.id, file)
       setShowExhaustedAlert(false)
       setExhaustedFileName(null)
       if (fileInputRef.current) {
@@ -57,17 +59,17 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
     }
   }
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (
       !campaign.service ||
       !campaign.destination ||
-      !campaign.proxy ||
-      !campaign.numberFile ||
+      !campaign.phoneFile ||
       !campaign.dailyAmount
     ) {
+      console.error("Missing required fields - need phoneFile not just numberFile")
       return
     }
-    startCampaign(campaign.id)
+    await startCampaign(campaign.id)
     setShowExhaustedAlert(false)
   }
 
@@ -107,8 +109,7 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
               disabled={
                 !campaign.service ||
                 !campaign.destination ||
-                !campaign.proxy ||
-                !campaign.numberFile ||
+                !campaign.phoneFile ||
                 !campaign.dailyAmount
               }
               className="w-28 h-8 bg-neutral-700 hover:bg-neutral-800 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -157,55 +158,36 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
   }
 
   return (
-    <div className="grid grid-cols-[1fr_1fr_1.5fr_1.5fr_0.8fr_150px_70px_50px] gap-2 px-4 py-3 border border-border rounded-md bg-card items-center hover:shadow-sm transition-shadow">
-      <Select
+    <div className="grid grid-cols-[1fr_1fr_0.8fr_1.5fr_0.8fr_150px_70px_50px] gap-2 px-4 py-3 border border-border rounded-md bg-card items-center hover:shadow-sm transition-shadow">
+      <Input
+        type="text"
         value={campaign.service}
-        onValueChange={(value) => updateCampaign(campaign.id, { service: value })}
+        onChange={(e) => updateCampaign(campaign.id, { service: e.target.value })}
+        placeholder="Enter site name"
+        className="h-9 text-sm"
+        disabled={campaign.status !== "idle"}
+      />
+
+      <Input
+        type="text"
+        value={campaign.destination}
+        onChange={(e) => updateCampaign(campaign.id, { destination: e.target.value })}
+        placeholder="Enter country name"
+        className="h-9 text-sm"
+        disabled={campaign.status !== "idle"}
+      />
+
+      <Select
+        value={campaign.otpType}
+        onValueChange={(value) => updateCampaign(campaign.id, { otpType: value as OtpType })}
         disabled={campaign.status !== "idle"}
       >
         <SelectTrigger className="h-9 text-sm truncate w-full">
-          <SelectValue placeholder="Select service" />
+          <SelectValue placeholder="OTP" />
         </SelectTrigger>
         <SelectContent>
-          {SERVICES.map((service) => (
-            <SelectItem key={service} value={service}>
-              {service}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={campaign.destination}
-        onValueChange={(value) => updateCampaign(campaign.id, { destination: value })}
-        disabled={campaign.status !== "idle"}
-      >
-        <SelectTrigger className="h-9 text-sm truncate w-full">
-          <SelectValue placeholder="Select" />
-        </SelectTrigger>
-        <SelectContent className="max-h-[300px]">
-          {COUNTRIES.map((country) => (
-            <SelectItem key={country} value={country}>
-              {country}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={campaign.proxy}
-        onValueChange={(value) => updateCampaign(campaign.id, { proxy: value })}
-        disabled={campaign.status !== "idle"}
-      >
-        <SelectTrigger className="h-9 text-sm truncate w-full">
-          <SelectValue placeholder="Select" />
-        </SelectTrigger>
-        <SelectContent className="max-h-[300px]">
-          {PROXIES.map((proxy) => (
-            <SelectItem key={proxy} value={proxy}>
-              {proxy}
-            </SelectItem>
-          ))}
+          <SelectItem value="TXT">TXT</SelectItem>
+          <SelectItem value="VOICE">VOICE</SelectItem>
         </SelectContent>
       </Select>
 
@@ -284,7 +266,7 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
 
       <div className="min-w-0">{getStatusButton()}</div>
 
-      <div className="text-right font-semibold text-sm">{campaign.processed.toLocaleString()}</div>
+      <div className="text-right font-semibold text-sm">{(campaign.processed ?? 0).toLocaleString()}</div>
 
       <div className="flex justify-center">
         {campaign.status === "idle" && (

@@ -7,9 +7,6 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import CryptoJS from "crypto-js"
 
-
-const authSecret = process.env.NEXT_PUBLIC_AUTH_SECRET
-
 export default function Home() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
@@ -27,7 +24,8 @@ export default function Home() {
       const bytes = CryptoJS.AES.decrypt(authKey, process.env.NEXT_PUBLIC_AUTH_ENCRYPTION_SECRET!)
       const decrypted = JSON.parse(bytes.toString(CryptoJS.enc.Utf8))
 
-      if (decrypted.token === authSecret && decrypted.valid === true) {
+      // Check if user has valid auth data from API login
+      if (decrypted.secret_key && decrypted.valid === true) {
         setIsLoading(false)
       } else {
         router.push("/login")
