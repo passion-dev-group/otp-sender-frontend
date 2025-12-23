@@ -177,14 +177,21 @@ export const useCampaignStore = create<CampaignStore>()(
 
               const status = await getJobStatus(currentCampaign.jobId)
 
-              // Map backend status to frontend status
-              let frontendStatus: CampaignStatus = "in_progress"
-              if (status.status === "completed") frontendStatus = "paused"
-              if (status.status === "cancelled") frontendStatus = "paused"
-              if (status.cancelled === 1) frontendStatus = "paused"
+              // DEBUG: Log backend response to see what status is returned
+              // console.log("[POLL] Backend status response:", status.status, "cancelled:", status.cancelled, "jobDetail:", status.jobDetail)
 
-              // Use jobDetail.completed for processed count
-              const processedCount = status.jobDetail?.completed ?? 0
+              // Map backend status to frontend status
+              // Job is done when status is: completed, cancelled, failed, OR cancelled flag is 1
+              let frontendStatus: CampaignStatus = "in_progress"
+              if (["completed", "cancelled", "failed"].includes(status.status) || status.cancelled === 1) {
+                frontendStatus = "completed"
+                // console.log("[POLL] Setting frontend status to COMPLETED")
+              }
+
+              // Use jobDetail.completed + failed + cancelled for total processed count
+              const processedCount = (status.jobDetail?.completed ?? 0) +
+                (status.jobDetail?.failed ?? 0) +
+                (status.jobDetail?.cancelled ?? 0)
 
               set((state) => ({
                 campaigns: state.campaigns.map((c) =>
@@ -195,7 +202,8 @@ export const useCampaignStore = create<CampaignStore>()(
               }))
 
               // Stop polling if job is done
-              if (["completed", "cancelled"].includes(status.status) || status.cancelled === 1) {
+              if (["completed", "cancelled", "failed"].includes(status.status) || status.cancelled === 1) {
+                // console.log("[POLL] Job done, stopping polling")
                 clearInterval(processingIntervals[id])
                 delete processingIntervals[id]
               }
