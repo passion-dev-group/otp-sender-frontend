@@ -1,9 +1,9 @@
 /**
  * Backend API Client
- * Base URL: http://localhost:3000
+ * Base URL: http://65.108.79.220:3000
  */
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = "http://65.108.79.220:3000";
 
 // =============================================================================
 // Types
