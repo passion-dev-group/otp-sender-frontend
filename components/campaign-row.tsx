@@ -6,10 +6,20 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Upload, Play, Pause, AlertCircle, Trash2 } from "lucide-react"
+import { Upload, AlertCircle, Trash2, X } from "lucide-react"
 import { useCampaignStore } from "@/lib/campaign-store"
-import { PauseOptionsDialog } from "@/components/pause-options-dialog"
+// import { PauseOptionsDialog } from "@/components/pause-options-dialog"
 import type { Campaign, OtpType } from "@/lib/types"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface CampaignRowProps {
   campaign: Campaign
@@ -17,18 +27,20 @@ interface CampaignRowProps {
 
 export function CampaignRow({ campaign }: CampaignRowProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [showPauseDialog, setShowPauseDialog] = useState(false)
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  // const [showPauseDialog, setShowPauseDialog] = useState(false)
   const [showExhaustedAlert, setShowExhaustedAlert] = useState(false)
   const [exhaustedFileName, setExhaustedFileName] = useState<string | null>(null)
   const {
     updateCampaign,
     startCampaign,
-    pauseCampaign,
-    resumeCampaign,
+    // pauseCampaign,
+    // resumeCampaign,
     uploadNumberList,
     setPhoneFile,
     deleteCampaign,
     archiveCampaign,
+    pauseAndArchive,
   } = useCampaignStore()
 
   useEffect(() => {
@@ -39,11 +51,11 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
         if (campaign.processed >= totalNumbers) {
           setExhaustedFileName(campaign.numberFile)
           setShowExhaustedAlert(true)
-          pauseCampaign(campaign.id)
+          // Note: Don't call pauseCampaign here - backend handles completion via polling
         }
       }
     }
-  }, [campaign.processed, campaign.numberFile, campaign.status, campaign.id, pauseCampaign])
+  }, [campaign.processed, campaign.numberFile, campaign.status])
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -63,8 +75,7 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
     if (
       !campaign.service ||
       !campaign.destination ||
-      !campaign.phoneFile ||
-      !campaign.dailyAmount
+      !campaign.phoneFile
     ) {
       console.error("Missing required fields - need phoneFile not just numberFile")
       return
@@ -73,13 +84,18 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
     setShowExhaustedAlert(false)
   }
 
-  const handlePause = () => {
-    setShowPauseDialog(true)
-  }
+  // const handlePause = () => {
+  //   setShowPauseDialog(true)
+  // }
 
-  const handleResume = () => {
-    resumeCampaign(campaign.id)
-    setShowExhaustedAlert(false)
+  // const handleResume = () => {
+  //   resumeCampaign(campaign.id)
+  //   setShowExhaustedAlert(false)
+  // }
+
+  const handleCancelConfirm = async () => {
+    await pauseAndArchive(campaign.id)
+    setShowCancelConfirm(false)
   }
 
   const triggerFileInput = () => {
@@ -109,8 +125,7 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
               disabled={
                 !campaign.service ||
                 !campaign.destination ||
-                !campaign.phoneFile ||
-                !campaign.dailyAmount
+                !campaign.phoneFile
               }
               className="w-28 h-8 bg-neutral-700 hover:bg-neutral-800 text-white text-xs font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -125,31 +140,48 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
               IN PROGRESS
             </div>
             <Button
-              onClick={handlePause}
+              onClick={() => setShowCancelConfirm(true)}
               size="icon"
               className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white rounded-md flex-shrink-0"
+              title="Cancel campaign"
             >
-              <Pause className="h-3.5 w-3.5" />
+              <X className="h-3.5 w-3.5" />
             </Button>
           </div>
         )
-      case "paused":
+      // case "paused":
+      //   return (
+      //     <div className="flex items-center gap-1">
+      //       <div
+      //         className={`bg-orange-500 text-white px-3 rounded-md text-center text-xs font-medium h-8 flex items-center justify-center w-28`}
+      //       >
+      //         PAUSED
+      //       </div>
+      //       {!showExhaustedAlert && !isListExhausted() && (
+      //         <Button
+      //           onClick={handleResume}
+      //           size="icon"
+      //           className="h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md flex-shrink-0"
+      //         >
+      //           <Play className="h-3.5 w-3.5" />
+      //         </Button>
+      //       )}
+      //     </div>
+      //   )
+      case "completed":
         return (
           <div className="flex items-center gap-1">
-            <div
-              className={`bg-orange-500 text-white px-3 rounded-md text-center text-xs font-medium h-8 flex items-center justify-center w-28`}
-            >
-              PAUSED
+            <div className="bg-blue-500 text-white px-3 rounded-md text-center text-xs font-medium w-28 h-8 flex items-center justify-center">
+              COMPLETED
             </div>
-            {!showExhaustedAlert && !isListExhausted() && (
-              <Button
-                onClick={handleResume}
-                size="icon"
-                className="h-8 w-8 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md flex-shrink-0"
-              >
-                <Play className="h-3.5 w-3.5" />
-              </Button>
-            )}
+            <Button
+              onClick={() => setShowCancelConfirm(true)}
+              size="icon"
+              className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white rounded-md flex-shrink-0"
+              title="Delete campaign"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
           </div>
         )
       default:
@@ -158,7 +190,7 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
   }
 
   return (
-    <div className="grid grid-cols-[1fr_1fr_0.8fr_1.5fr_0.8fr_150px_70px_50px] gap-2 px-4 py-3 border border-border rounded-md bg-card items-center hover:shadow-sm transition-shadow">
+    <div className="grid grid-cols-[1fr_1fr_0.8fr_1.5fr_150px_70px_50px] gap-2 px-4 py-3 border border-border rounded-md bg-card items-center hover:shadow-sm transition-shadow">
       <Input
         type="text"
         value={campaign.service}
@@ -255,14 +287,14 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
         )}
       </div>
 
-      <Input
+      {/* <Input
         type="number"
         value={campaign.dailyAmount}
         onChange={(e) => updateCampaign(campaign.id, { dailyAmount: e.target.value })}
         placeholder="0"
         className="h-9 text-sm"
         disabled={campaign.status !== "idle"}
-      />
+      /> */}
 
       <div className="min-w-0">{getStatusButton()}</div>
 
@@ -282,7 +314,25 @@ export function CampaignRow({ campaign }: CampaignRowProps) {
         )}
       </div>
 
-      <PauseOptionsDialog open={showPauseDialog} onOpenChange={setShowPauseDialog} campaignId={campaign.id} />
+      {/* <PauseOptionsDialog open={showPauseDialog} onOpenChange={setShowPauseDialog} campaignId={campaign.id} /> */}
+
+      {/* Cancel Confirmation Dialog */}
+      <AlertDialog open={showCancelConfirm} onOpenChange={setShowCancelConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Campaign?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this campaign? This will stop all processing and archive the campaign. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>No, Keep Running</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCancelConfirm} className="bg-red-500 hover:bg-red-600">
+              Yes, Cancel Campaign
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

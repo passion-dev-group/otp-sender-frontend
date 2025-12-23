@@ -33,7 +33,7 @@ export interface JobStatusResponse {
     siteName: string;
     country: string;
     otpType: "TXT" | "VOICE" | null;
-    status: "pending" | "processing" | "completed" | "cancelled";
+    status: "pending" | "processing" | "completed" | "cancelled" | "failed";
     cancelled: number;  // 0 or 1
     createdAt: string;
     updatedAt: string;

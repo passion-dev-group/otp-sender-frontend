@@ -1,4 +1,4 @@
-export type CampaignStatus = "idle" | "in_progress" | "paused" | "archived"
+export type CampaignStatus = "idle" | "in_progress" | "paused" | "archived" | "completed"
 
 export type OtpType = "TXT" | "VOICE"
 
