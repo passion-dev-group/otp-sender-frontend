@@ -1,9 +1,7 @@
 /**
  * Backend API Client
- * Base URL: http://65.108.79.220:3000
+ * Calls local Next.js API routes which proxy to the backend
  */
-
-const API_BASE = "http://65.108.79.220:3000";
 
 // =============================================================================
 // Types
@@ -116,7 +114,7 @@ function getAuthKey(): string | null {
  * GET /api/sites
  */
 export async function getSites(): Promise<string[]> {
-    const response = await fetch(`${API_BASE}/api/sites`);
+    const response = await fetch(`/api/sites`);
 
     if (!response.ok) {
         throw new Error(`Failed to fetch sites: ${response.statusText}`);
@@ -143,7 +141,7 @@ export async function createJob(formData: FormData): Promise<CreateJobResponse> 
         headers["Authorization"] = `Bearer ${authKey}`;
     }
 
-    const response = await fetch(`${API_BASE}/api/jobs`, {
+    const response = await fetch(`/api/jobs`, {
         method: "POST",
         headers,
         body: formData,
@@ -175,7 +173,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
         headers["Authorization"] = `Bearer ${authKey}`;
     }
 
-    const response = await fetch(`${API_BASE}/api/jobs/${jobId}/status`, {
+    const response = await fetch(`/api/jobs/${jobId}/status`, {
         headers,
     });
 
@@ -204,7 +202,7 @@ export async function cancelJob(jobId: string): Promise<CancelJobResponse> {
         headers["Authorization"] = `Bearer ${authKey}`;
     }
 
-    const response = await fetch(`${API_BASE}/api/jobs/${jobId}`, {
+    const response = await fetch(`/api/jobs/${jobId}`, {
         method: "DELETE",
         headers,
     });
@@ -232,7 +230,7 @@ export async function cancelJob(jobId: string): Promise<CancelJobResponse> {
  * POST /api/auth/login
  */
 export async function login(secretKey: string): Promise<LoginResponse> {
-    const response = await fetch(`${API_BASE}/api/auth/login`, {
+    const response = await fetch(`/api/auth/login`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

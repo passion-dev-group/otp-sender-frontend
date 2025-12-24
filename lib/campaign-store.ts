@@ -178,14 +178,14 @@ export const useCampaignStore = create<CampaignStore>()(
               const status = await getJobStatus(currentCampaign.jobId)
 
               // DEBUG: Log backend response to see what status is returned
-              // console.log("[POLL] Backend status response:", status.status, "cancelled:", status.cancelled, "jobDetail:", status.jobDetail)
+              console.log("[POLL] Backend status response:", status.status, "cancelled:", status.cancelled, "jobDetail:", status.jobDetail)
 
               // Map backend status to frontend status
               // Job is done when status is: completed, cancelled, failed, OR cancelled flag is 1
               let frontendStatus: CampaignStatus = "in_progress"
               if (["completed", "cancelled", "failed"].includes(status.status) || status.cancelled === 1) {
                 frontendStatus = "completed"
-                // console.log("[POLL] Setting frontend status to COMPLETED")
+                console.log("[POLL] Setting frontend status to COMPLETED")
               }
 
               // Use jobDetail.completed + failed + cancelled for total processed count
@@ -203,7 +203,7 @@ export const useCampaignStore = create<CampaignStore>()(
 
               // Stop polling if job is done
               if (["completed", "cancelled", "failed"].includes(status.status) || status.cancelled === 1) {
-                // console.log("[POLL] Job done, stopping polling")
+                console.log("[POLL] Job done, stopping polling")
                 clearInterval(processingIntervals[id])
                 delete processingIntervals[id]
               }
